@@ -403,11 +403,11 @@ namespace Nancy.Testing
         }
 
         /// <summary>
-        /// Register the default implementations of internally used types into the container as singletons
+        /// Register the given instances into the application container
         /// </summary>
         /// <param name="container">Container to register into</param>
         /// <param name="typeRegistrations">Type registrations to register</param>
-        protected override void RegisterTypes(TinyIoCContainer container, IEnumerable<TypeRegistration> typeRegistrations)
+        protected override void RegisterApplicationTypes(TinyIoCContainer container, IEnumerable<TypeRegistration> typeRegistrations)
         {
             var configuredTypes = this.GetTypeRegistrations().ToList();
 
@@ -422,12 +422,12 @@ namespace Nancy.Testing
         }
 
         /// <summary>
-        /// Register the various collections into the container as singletons to later be resolved
+        /// Register the given collections into the container as singletons to later be resolved
         /// by IEnumerable{Type} constructor dependencies.
         /// </summary>
         /// <param name="container">Container to register into</param>
-        /// <param name="collectionTypeRegistrations">Collection type registrations to register</param>
-        protected override void RegisterCollectionTypes(TinyIoCContainer container, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrations)
+        /// <param name="collectionTypeRegistrationsn">Collection type registrations to register</param>
+        protected override void RegisterApplicationCollectionTypes(TinyIoCContainer container, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrations)
         {
             var configuredCollectionTypes = this.GetCollectionTypeRegistrations().ToList();
 
@@ -441,11 +441,11 @@ namespace Nancy.Testing
         }
 
         /// <summary>
-        /// Register the given instances into the container
+        /// Register the given instances into the container as singletons
         /// </summary>
         /// <param name="container">Container to register into</param>
         /// <param name="instanceRegistrations">Instance registration types</param>
-        protected override void RegisterInstances(TinyIoCContainer container, IEnumerable<InstanceRegistration> instanceRegistrations)
+        protected override void RegisterApplicationInstances(TinyIoCContainer container, IEnumerable<InstanceRegistration> instanceRegistrations)
         {
             instanceRegistrations = this.registeredInstances
                 .Concat(instanceRegistrations.Where(x => this.registeredInstances.All(y => y.RegistrationType != x.RegistrationType)))
