@@ -219,5 +219,67 @@ namespace Nancy
 
             container.AutoRegister(AppDomain.CurrentDomain.GetAssemblies().Where(a => !ignoredAssemblies.Any(ia => ia(a))), t => t.Assembly != assembly || whitelist.Any(wt => wt == t));
         }
+
+        /// <summary>
+        /// Gets all registered request registration tasks
+        /// </summary>
+        /// <param name="requestContainer">Request container instance</param>
+        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IRequestRegistrations"/> instances.</returns>
+        protected override IEnumerable<IRequestRegistrations> GetRequestRegistrationTasks(TinyIoCContainer requestContainer)
+        {
+            return requestContainer.ResolveAll<IRequestRegistrations>(false);
+        }
+
+        /// <summary>
+        /// Gets all registered request startup tasks
+        /// </summary>
+        /// <param name="requestContainer">Request container instance</param>
+        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IRequestStartup"/> instances.</returns>
+        protected override IEnumerable<IRequestStartup> GetRequestStartupTasks(TinyIoCContainer requestContainer)
+        {
+            return requestContainer.ResolveAll<IRequestStartup>(false);
+        }
+
+        /// <summary>
+        /// Register the various collections into the request container as singletons to later be resolved
+        /// by IEnumerable{Type} constructor dependencies.
+        /// </summary>
+        /// <param name="requestContainer">Request container to register into</param>
+        /// <param name="collectionTypeRegistrationsn">Collection type registrations to register</param>
+        protected override sealed void RegisterRequestCollectionTypes(TinyIoCContainer requestContainer, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrationsn)
+        {
+            foreach (var collectionTypeRegistration in collectionTypeRegistrationsn)
+            {
+                requestContainer.RegisterMultiple(collectionTypeRegistration.RegistrationType, collectionTypeRegistration.ImplementationTypes);
+            }
+        }
+
+        /// <summary>
+        /// Register the given instances into the request container
+        /// </summary>
+        /// <param name="requestContainer">Request container to register into</param>
+        /// <param name="instanceRegistrations">Instance registration types</param>
+        protected override void RegisterRequestInstances(TinyIoCContainer requestContainer, IEnumerable<InstanceRegistration> instanceRegistrations)
+        {
+            foreach (var instanceRegistration in instanceRegistrations)
+            {
+                requestContainer.Register(
+                    instanceRegistration.RegistrationType,
+                    instanceRegistration.Implementation);
+            }
+        }
+
+        /// <summary>
+        /// Register the given instances into the request container as singletons
+        /// </summary>
+        /// <param name="requestContainer">Request container to register into</param>
+        /// <param name="typeRegistrations">Type registrations to register</param>
+        protected override sealed void RegisterRequestTypes(TinyIoCContainer requestContainer, IEnumerable<TypeRegistration> typeRegistrations)
+        {
+            foreach (var typeRegistration in typeRegistrations)
+            {
+                requestContainer.Register(typeRegistration.RegistrationType, typeRegistration.ImplementationType).AsSingleton();
+            }
+        }
     }
 }

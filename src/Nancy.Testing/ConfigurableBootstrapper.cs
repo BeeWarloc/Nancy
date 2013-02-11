@@ -523,6 +523,59 @@ namespace Nancy.Testing
         }
 
         /// <summary>
+        /// Gets all registered request registration tasks
+        /// </summary>
+        /// <param name="requestContainer">Request container instance</param>
+        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IRequestRegistrations"/> instances.</returns>
+        protected override IEnumerable<IRequestRegistrations> GetRequestRegistrationTasks(TinyIoCContainer requestContainer)
+        {
+            // TODO: add support for request type registrations
+            return new IRequestRegistrations[0];
+        }
+
+        /// <summary>
+        /// Gets all registered request startup tasks
+        /// </summary>
+        /// <param name="requestContainer">Request container instance</param>
+        /// <returns>An <see cref="IEnumerable{T}"/> instance containing <see cref="IRequestStartup"/> instances.</returns>
+        protected override IEnumerable<IRequestStartup> GetRequestStartupTasks(TinyIoCContainer requestContainer)
+        {
+            // TODO: add support for request type registrations
+            return new IRequestStartup[0];
+        }
+
+        /// <summary>
+        /// Register the various collections into the request container as singletons to later be resolved
+        /// by IEnumerable{Type} constructor dependencies.
+        /// </summary>
+        /// <param name="requestContainer">Request container to register into</param>
+        /// <param name="collectionTypeRegistrationsn">Collection type registrations to register</param>
+        protected override sealed void RegisterRequestCollectionTypes(TinyIoCContainer requestContainer, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrationsn)
+        {
+            // TODO: add support for request type registrations
+        }
+
+        /// <summary>
+        /// Register the given instances into the request container
+        /// </summary>
+        /// <param name="requestContainer">Request container to register into</param>
+        /// <param name="instanceRegistrations">Instance registration types</param>
+        protected override void RegisterRequestInstances(TinyIoCContainer requestContainer, IEnumerable<InstanceRegistration> instanceRegistrations)
+        {
+            // TODO: add support for request type registrations
+        }
+
+        /// <summary>
+        /// Register the given instances into the request container as singletons
+        /// </summary>
+        /// <param name="requestContainer">Request container to register into</param>
+        /// <param name="typeRegistrations">Type registrations to register</param>
+        protected override sealed void RegisterRequestTypes(TinyIoCContainer requestContainer, IEnumerable<TypeRegistration> typeRegistrations)
+        {
+            // TODO: add support for request type registrations
+        }
+
+        /// <summary>
         /// Provides an API for configuring a <see cref="ConfigurableBootstrapper"/> instance.
         /// </summary>
         public class ConfigurableBootstrapperConfigurator
@@ -1627,6 +1680,8 @@ namespace Nancy.Testing
                 this.bootstrapper.requestStartupActions.Add(action);
                 return this;
             }
+
+
         }
 
         /// <summary>
