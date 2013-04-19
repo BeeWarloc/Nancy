@@ -123,6 +123,7 @@
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="DemoRequestStartup.cs" />
     <Compile Include="MainModule.cs" />
   </ItemGroup>
   <ItemGroup>

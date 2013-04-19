@@ -4,7 +4,15 @@ namespace Nancy.Demo.Bootstrapping.RequestHooks
     {
         public MainModule()
         {
-            Get["/"] = x => View["home"];
+            Get["/"] = x =>
+                {
+                    var model = new
+                        {
+                            RequestTime = Context.Items["request-time"] as string
+                        };
+
+                    return View["home", model];
+                };
         }
     }
 }
