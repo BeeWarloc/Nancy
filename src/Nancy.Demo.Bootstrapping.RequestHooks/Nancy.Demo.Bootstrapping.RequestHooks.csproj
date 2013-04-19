@@ -123,17 +123,17 @@
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <Compile Include="AthosMusketeer.cs" />
+    <Compile Include="Elf.cs" />
+    <Compile Include="MagicUser.cs" />
     <Compile Include="DungeonsAndDragons.cs" />
     <Compile Include="IRolePlayingGame.cs" />
-    <Compile Include="PorthosMusketeer.cs" />
-    <Compile Include="AramisMusketeer.cs" />
+    <Compile Include="Fighter.cs" />
     <Compile Include="DemoRequestRegistrations.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DemoRequestStartup.cs" />
     <Compile Include="MainModule.cs" />
-    <Compile Include="IMusketeer.cs" />
+    <Compile Include="ICharacterClass.cs" />
     <Compile Include="Die.cs" />
   </ItemGroup>
   <ItemGroup>

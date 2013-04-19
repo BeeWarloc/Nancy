@@ -7,17 +7,17 @@ namespace Nancy.Demo.Bootstrapping.RequestHooks
     {
         public MainModule(
             IRolePlayingGame rolePlayingGame, 
-            IEnumerable<IMusketeer> musketeers, 
+            IEnumerable<ICharacterClass> characterClasses, 
             Die die)
         {
             Get["/"] = x =>
                 {
                     var model = new
                         {
-                            RolePlayingGame = rolePlayingGame.Name,
-                            Musketeers = musketeers.ToArray(),
-                            RequestTime = Context.Items["request-time"] as string,
-                            Die = die.Sides.ToString()
+                            CharacterClasses = characterClasses.ToArray(),
+                            Die = die.Sides.ToString(),
+                            Now = Context.Items["now"] as string,
+                            RolePlayingGame = rolePlayingGame.Name
                         };
 
                     return View["home", model];

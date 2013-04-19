@@ -1,6 +1,6 @@
 ﻿namespace Nancy.Demo.Bootstrapping.RequestHooks
 {
-    public interface IMusketeer
+    public interface ICharacterClass
     {
         string Name { get; }
     }

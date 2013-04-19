@@ -1,10 +1,10 @@
 ﻿namespace Nancy.Demo.Bootstrapping.RequestHooks
 {
-    public class PorthosMusketeer : IMusketeer
+    public class MagicUser : ICharacterClass
     {
         public string Name
         {
-            get { return "Porthos"; }
+            get { return "Magic-User"; }
         }
     }
 }

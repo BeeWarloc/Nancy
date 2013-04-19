@@ -22,11 +22,11 @@
             {
                 return new []
                     {
-                        new CollectionTypeRegistration(typeof(IMusketeer), new []
+                        new CollectionTypeRegistration(typeof(ICharacterClass), new []
                             {
-                                typeof(AramisMusketeer),
-                                typeof(AthosMusketeer),
-                                typeof(PorthosMusketeer)
+                                typeof(Fighter),
+                                typeof(MagicUser),
+                                typeof(Elf)
                             })
                     };
             }

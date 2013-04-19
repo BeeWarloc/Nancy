@@ -8,7 +8,7 @@ namespace Nancy.Demo.Bootstrapping.RequestHooks
     {
         public void Initialize(IPipelines pipelines, NancyContext context)
         {
-            context.Items["request-time"] = DateTime.UtcNow.ToString(CultureInfo.InvariantCulture);
+            context.Items["now"] = DateTime.UtcNow.ToString(CultureInfo.InvariantCulture);
         }
     }
 }
