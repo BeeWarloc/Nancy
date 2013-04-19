@@ -165,6 +165,22 @@
         }
 
         /// <summary>
+        /// Gets all request registration tasks
+        /// </summary>
+        protected virtual IEnumerable<Type> RequestRegistrationTasks
+        {
+            get { return AppDomainAssemblyTypeScanner.TypesOf<IRequestRegistrations>(); }
+        }
+
+        /// <summary>
+        /// Gets all request startup tasks
+        /// </summary>
+        protected virtual IEnumerable<Type> RequestStartupTasks
+        {
+            get { return AppDomainAssemblyTypeScanner.TypesOf<IRequestStartup>(); }
+        }
+
+        /// <summary>
         /// Gets the root path provider
         /// </summary>
         protected virtual IRootPathProvider RootPathProvider
@@ -536,7 +552,9 @@
                     new CollectionTypeRegistration(typeof(IBodyDeserializer), this.BodyDeserializers),
                     new CollectionTypeRegistration(typeof(IApplicationStartup), this.ApplicationStartupTasks), 
                     new CollectionTypeRegistration(typeof(IApplicationRegistrations), this.ApplicationRegistrationTasks), 
-                    new CollectionTypeRegistration(typeof(IModelValidatorFactory), this.ModelValidatorFactories)
+                    new CollectionTypeRegistration(typeof(IModelValidatorFactory), this.ModelValidatorFactories),
+                    new CollectionTypeRegistration(typeof(IRequestRegistrations), this.RequestRegistrationTasks),
+                    new CollectionTypeRegistration(typeof(IRequestStartup), this.RequestStartupTasks)
                 };
         }
 
