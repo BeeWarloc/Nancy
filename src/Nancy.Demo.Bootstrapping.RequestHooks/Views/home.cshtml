@@ -5,6 +5,16 @@
 <body>
     <h1>Request Hooks Demo</h1>
     
-    Request Timestamp, via a request start-up task: @Model.RequestTime
+    <p>Request Timestamp, via a demo IRequestSartup: @Model.RequestTime</p>
+    
+    <p>
+        The Three Musketeers, via a demo IRequestRegistration.CollectionTypeRegistrations:
+        <ul>
+            @foreach (var musketeer in Model.Musketeers)
+            {
+                <li>@musketeer.Name</li>
+            }
+        </ul>
+    </p>
 </body>
 </html>

@@ -123,8 +123,15 @@
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
+    <Compile Include="AthosMusketeer.cs" />
+    <Compile Include="PorthosMusketeer.cs" />
+    <Compile Include="AramisMusketeer.cs" />
+    <Compile Include="DemoRequestRegistrations.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DemoRequestStartup.cs" />
     <Compile Include="MainModule.cs" />
+    <Compile Include="IDemoCollectionType.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Views\home.cshtml" />
