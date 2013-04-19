@@ -134,7 +134,7 @@
     <Compile Include="DemoRequestStartup.cs" />
     <Compile Include="MainModule.cs" />
     <Compile Include="IMusketeer.cs" />
-    <Compile Include="TheAnswer.cs" />
+    <Compile Include="Die.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Views\home.cshtml" />

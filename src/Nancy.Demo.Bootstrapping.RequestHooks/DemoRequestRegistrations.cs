@@ -38,7 +38,7 @@
             {
                 return new[]
                     {
-                        new InstanceRegistration(typeof (TheAnswer), new TheAnswer {Value = 42})
+                        new InstanceRegistration(typeof (Die), new Die {Sides = 20})
                     };
             }
         }

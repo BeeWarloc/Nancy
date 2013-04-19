@@ -8,7 +8,7 @@ namespace Nancy.Demo.Bootstrapping.RequestHooks
         public MainModule(
             IRolePlayingGame rolePlayingGame, 
             IEnumerable<IMusketeer> musketeers, 
-            TheAnswer theAnswer)
+            Die die)
         {
             Get["/"] = x =>
                 {
@@ -17,7 +17,7 @@ namespace Nancy.Demo.Bootstrapping.RequestHooks
                             RolePlayingGame = rolePlayingGame.Name,
                             Musketeers = musketeers.ToArray(),
                             RequestTime = Context.Items["request-time"] as string,
-                            TheAnswer = theAnswer.Value.ToString()
+                            Die = die.Sides.ToString()
                         };
 
                     return View["home", model];
