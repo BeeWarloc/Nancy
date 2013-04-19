@@ -124,6 +124,8 @@
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="AthosMusketeer.cs" />
+    <Compile Include="DungeonsAndDragons.cs" />
+    <Compile Include="IRolePlayingGame.cs" />
     <Compile Include="PorthosMusketeer.cs" />
     <Compile Include="AramisMusketeer.cs" />
     <Compile Include="DemoRequestRegistrations.cs">
@@ -131,7 +133,7 @@
     </Compile>
     <Compile Include="DemoRequestStartup.cs" />
     <Compile Include="MainModule.cs" />
-    <Compile Include="IDemoCollectionType.cs" />
+    <Compile Include="IMusketeer.cs" />
     <Compile Include="TheAnswer.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -7,7 +7,13 @@
     {
         public IEnumerable<TypeRegistration> TypeRegistrations
         {
-            get { return new TypeRegistration[0]; }
+            get
+            {
+                return new[]
+                    {
+                        new TypeRegistration(typeof (IRolePlayingGame), typeof (DungeonsAndDragons))
+                    };
+            }
         }
 
         public IEnumerable<CollectionTypeRegistration> CollectionTypeRegistrations
