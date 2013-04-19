@@ -28,7 +28,13 @@
 
         public IEnumerable<InstanceRegistration> InstanceRegistrations
         {
-            get { return new InstanceRegistration[0]; }
+            get
+            {
+                return new[]
+                    {
+                        new InstanceRegistration(typeof (TheAnswer), new TheAnswer {Value = 42})
+                    };
+            }
         }
     }
 }

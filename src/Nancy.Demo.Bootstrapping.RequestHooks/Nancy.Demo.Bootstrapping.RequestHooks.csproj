@@ -132,6 +132,7 @@
     <Compile Include="DemoRequestStartup.cs" />
     <Compile Include="MainModule.cs" />
     <Compile Include="IDemoCollectionType.cs" />
+    <Compile Include="TheAnswer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Views\home.cshtml" />
