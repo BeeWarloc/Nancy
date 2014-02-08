@@ -21,22 +21,6 @@ namespace Nancy
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether Nancy should disable caching
-        /// </summary>
-        [Obsolete("DisableCaches is now obsolete, please see the StaticConfiguration.Caching properties for more finely grained control", true)]
-        public static bool DisableCaches
-        {
-            get
-            {
-                return disableCaches ?? (bool)(disableCaches = IsRunningDebug);
-            }
-            set
-            {
-                disableCaches = value;
-            }
-        }
-
-        /// <summary>
         /// Gets or sets a value indicating whether or not to disable traces in error messages
         /// </summary>
         [Description("Disables trace output in the default 500 error pages.")]
@@ -51,6 +35,12 @@ namespace Nancy
                 disableErrorTraces = value;
             }
         }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether or not to respond with 405 responses
+        /// </summary>
+        [Description("Disables 405 responses from being sent to the client.")]
+        public static bool DisableMethodNotAllowedResponses { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether or not to enable case sensitivity in query, parameters (DynamicDictionary) and model binding. Enable this to conform with RFC3986.
@@ -81,18 +71,15 @@ namespace Nancy
         {
             try
             {
-                var assembly = AppDomainAssemblyTypeScanner.TypesOf<INancyModule>(true).FirstOrDefault().Assembly;
+                //Get all non-nancy assemblies, and select the custom attributes
+                var assembliesInDebug
+                    = AppDomainAssemblyTypeScanner.TypesOf<INancyModule>(ScanMode.ExcludeNancy)
+                                                  .Select(x => x.Assembly.GetCustomAttributes(typeof(DebuggableAttribute), true))
+                                                  .Where(x => x.Length != 0);
 
-                var attributes = assembly.GetCustomAttributes(typeof(DebuggableAttribute), true);
-
-                if (attributes.Length == 0)
-                {
-                    return false;
-                }
-
-                var d = (DebuggableAttribute)attributes[0];
-
-                return d.IsJITTrackingEnabled;
+                //if there are any, then return the IsJITTrackingEnabled
+                //else if the collection is empty it returns false
+                return assembliesInDebug.Any(d => ((DebuggableAttribute)d[0]).IsJITTrackingEnabled);
             }
             catch (Exception)
             {

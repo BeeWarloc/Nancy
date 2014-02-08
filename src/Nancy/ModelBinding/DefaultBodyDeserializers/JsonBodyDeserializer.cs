@@ -18,8 +18,9 @@ namespace Nancy.ModelBinding.DefaultBodyDeserializers
         /// Whether the deserializer can deserialize the content type
         /// </summary>
         /// <param name="contentType">Content type to deserialize</param>
+        /// <param name="context">Current <see cref="BindingContext"/>.</param>
         /// <returns>True if supported, false otherwise</returns>
-        public bool CanDeserialize(string contentType)
+        public bool CanDeserialize(string contentType, BindingContext context)
         {
             return Json.IsJsonContentType(contentType);
         }
@@ -33,7 +34,7 @@ namespace Nancy.ModelBinding.DefaultBodyDeserializers
         /// <returns>Model instance</returns>
         public object Deserialize(string contentType, Stream bodyStream, BindingContext context)
         {
-            var serializer = new JavaScriptSerializer(null, false, JsonSettings.MaxJsonLength, JsonSettings.MaxRecursions);
+            var serializer = new JavaScriptSerializer(null, false, JsonSettings.MaxJsonLength, JsonSettings.MaxRecursions, JsonSettings.RetainCasing, JsonSettings.ISO8601DateFormat);
             serializer.RegisterConverters(JsonSettings.Converters);
 
             bodyStream.Position = 0;

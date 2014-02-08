@@ -105,8 +105,20 @@ namespace Nancy
                 GetPort(this.Port) +
                 GetCorrectPath(this.BasePath) +
                 GetCorrectPath(this.Path) +
-                this.Query +
+                GetQuery(this.Query) +
                 GetFragment(this.Fragment);
+        }
+
+        private static string GetQuery(string query)
+        {
+            if (string.IsNullOrEmpty(query))
+            {
+                return string.Empty;
+            }
+
+            return query.StartsWith("?", StringComparison.OrdinalIgnoreCase) ?
+                query :
+                string.Concat("?", query);
         }
 
         /// <summary>
@@ -137,6 +149,26 @@ namespace Nancy
         }
 
         /// <summary>
+        /// Casts the current <see cref="Url"/> instance to a <see cref="string"/> instance.
+        /// </summary>
+        /// <param name="url">The instance that should be cast.</param>
+        /// <returns>A <see cref="string"/> representation of the <paramref name="url"/>.</returns>
+        public static implicit operator String(Url url)
+        {
+            return url.ToString();
+        }
+
+        /// <summary>
+        /// Casts the current <see cref="string"/> instance to a <see cref="Url"/> instance.
+        /// </summary>
+        /// <param name="url">The instance that should be cast.</param>
+        /// <returns>An <see cref="Url"/> representation of the <paramref name="url"/>.</returns>
+        public static implicit operator Url(string url)
+        {
+            return new Uri(url);
+        }
+
+        /// <summary>
         /// Casts the current <see cref="Url"/> instance to a <see cref="Uri"/> instance.
         /// </summary>
         /// <param name="url">The instance that should be cast.</param>
@@ -144,6 +176,25 @@ namespace Nancy
         public static implicit operator Uri(Url url)
         {
             return new Uri(url.ToString(), UriKind.Absolute);
+        }
+
+        /// <summary>
+        /// Casts a <see cref="Uri"/> instance to a <see cref="Url"/> instance
+        /// </summary>
+        /// <param name="uri">The instance that should be cast.</param>
+        /// <returns>An <see cref="Url"/> representation of the <paramref name="uri"/>.</returns>
+        public static implicit operator Url(Uri uri)
+        {
+            var url = new Url
+            {
+                HostName = uri.Host,
+                Path = uri.LocalPath,
+                Port = uri.Port,
+                Query = uri.Query,
+                Scheme = uri.Scheme
+            };
+
+            return url;
         }
 
         private static string GetFragment(string fragment)

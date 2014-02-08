@@ -8,6 +8,8 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
     using System.Text;
     using System.Threading;
 
+    using FakeItEasy;
+
     using Nancy.Json;
     using Nancy.ModelBinding;
     using Nancy.ModelBinding.DefaultBodyDeserializers;
@@ -46,7 +48,7 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
             const string contentType = "application/xml";
 
             // When
-            var result = this.deserialize.CanDeserialize(contentType);
+            var result = this.deserialize.CanDeserialize(contentType, A<BindingContext>._);
 
             // Then
             result.ShouldBeFalse();
@@ -59,7 +61,7 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
             const string contentType = "application/json";
 
             // When
-            var result = this.deserialize.CanDeserialize(contentType);
+            var result = this.deserialize.CanDeserialize(contentType, A<BindingContext>._);
 
             // Then
             result.ShouldBeTrue();
@@ -72,7 +74,7 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
             const string contentType = "text/json";
 
             // When
-            var result = this.deserialize.CanDeserialize(contentType);
+            var result = this.deserialize.CanDeserialize(contentType, A<BindingContext>._);
 
             // Then
             result.ShouldBeTrue();
@@ -85,7 +87,7 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
             const string contentType = "application/vnd.org.nancyfx.mything+json";
 
             // When
-            var result = this.deserialize.CanDeserialize(contentType);
+            var result = this.deserialize.CanDeserialize(contentType, A<BindingContext>._);
 
             // Then
             result.ShouldBeTrue();
@@ -98,7 +100,7 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
             const string contentType = "appLicaTion/jsOn";
 
             // When
-            var result = this.deserialize.CanDeserialize(contentType);
+            var result = this.deserialize.CanDeserialize(contentType, A<BindingContext>._);
 
             // Then
             result.ShouldBeTrue();
@@ -197,18 +199,33 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
             result.ListOfComplexObjectsProperty[1].Value2.ShouldEqual("four");
         }
 
+        [Fact]
+        public void Should_Deserialize_Signed_And_Unsigned_Nullable_Numeric_Types()
+        {
+            //Given
+            const string json = "{F1: 1, F2: 2, F3: 3}";
+
+            //When
+            var model = this.serializer.Deserialize<ModelWithNullables> (json);
+
+            //Should
+            Assert.Equal (1, model.F1);
+            Assert.Equal ((uint)2, model.F2);
+            Assert.Equal ((uint)3, model.F3);
+        }
+
 #if !__MonoCS__
         [Fact]
         public void Should_Serialize_Doubles_In_Different_Cultures()
         {
-			// TODO - fixup on mono, seems to throw inside double.parse
+            // TODO - fixup on mono, seems to throw inside double.parse
             // Given
             Thread.CurrentThread.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
 
-            var modelWithDoubleValues = 
+            var modelWithDoubleValues =
                 new ModelWithDoubleValues
                     {
-                        Latitude = 50.933984, 
+                        Latitude = 50.933984,
                         Longitude = 7.330627
                     };
 
@@ -231,14 +248,14 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
         [InlineData("\r\n")]
         [InlineData("\r")]
         public void Should_Serialize_Last_Prop_is_Bool_And_Trailing_NewLine(string lineEndings)
-        { 
+        {
             // Given
             var json = string.Concat("{\"Property\": true", lineEndings, "}");
 
             // When
             var s = new JavaScriptSerializer();
             var deserialized = (dynamic)s.DeserializeObject(json);
-            
+
             // Then
             Assert.True(deserialized["Property"]);
         }
@@ -248,11 +265,11 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
         {
             // Given
             var json = "{\"Property\": true}";
-            
+
             // When
             var s = new JavaScriptSerializer();
             var deserialized = (dynamic)s.DeserializeObject(json);
-            
+
             // Then
             Assert.True(deserialized["Property"]);
         }
@@ -346,4 +363,12 @@ namespace Nancy.Tests.Unit.ModelBinding.DefaultBodyDeserializers
 
         public double Longitude { get; set; }
     }
+
+    public class ModelWithNullables 
+    {
+        public int? F1 { get; set; } 
+        public uint F2 { get; set; } 
+        public uint? F3 { get; set; } 
+    }
+
 }

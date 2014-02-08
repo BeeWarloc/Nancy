@@ -42,13 +42,17 @@ namespace Nancy.Bootstrapper
 
         /// <summary>
         /// The default assemblies for scanning.
-        /// Includes the nancy assembly and anythign referencing a nancy assembly
+        /// Includes the nancy assembly and anything referencing a nancy assembly
         /// </summary>
         public static Func<Assembly, bool>[] DefaultAssembliesToScan = new Func<Assembly, bool>[]
-                                          {
-                                              x => x == nancyAssembly,
-                                              x => x.GetReferencedAssemblies().Any(r => r.Name.StartsWith("Nancy", StringComparison.OrdinalIgnoreCase))
-                                          };
+        {
+            x => x == nancyAssembly,
+            x =>
+            {
+                return !x.GetName().Name.StartsWith("Nancy.Testing",StringComparison.OrdinalIgnoreCase) &&
+                    x.GetReferencedAssemblies().Any(r => r.Name.StartsWith("Nancy", StringComparison.OrdinalIgnoreCase));
+            }
+        };
 
         /// <summary>
         /// Gets or sets a set of rules for which assemblies are scanned
@@ -258,25 +262,6 @@ namespace Nancy.Bootstrapper
             UpdateTypes();
 
             nancyReferencingAssembliesLoaded = true;
-        }
-
-        /// <summary>
-        /// Gets all types implementing a particular interface/base class
-        /// </summary>
-        /// <typeparam name="TType">Type to search for</typeparam>
-        /// <param name="excludeInternalTypes">Whether to exclude types inside the core Nancy assembly</param>
-        /// <returns>IEnumerable of types</returns>
-        [Obsolete("This method has been replaced by the overload that accepts a ScanMode parameter and will be removed in a subsequent release.")]
-        public static IEnumerable<Type> TypesOf<TType>(bool excludeInternalTypes = false)
-        {
-            var returnTypes = Types.Where(t => typeof(TType).IsAssignableFrom(t));
-
-            if (excludeInternalTypes)
-            {
-                returnTypes = returnTypes.Where(t => t.Assembly != nancyAssembly);
-            }
-
-            return returnTypes;
         }
 
         /// <summary>

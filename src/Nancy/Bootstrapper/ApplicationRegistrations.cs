@@ -38,7 +38,7 @@
         }
 
         /// <summary>
-        /// Scans for the implementation of <typeparamref name="T"/> and registers it.
+        /// Scans for the implementation of <typeparamref name="TRegistration"/> and registers it.
         /// </summary>
         /// <typeparam name="TRegistration">The <see cref="Type"/> to scan for and register as.</typeparam>
         public void Register<TRegistration>()
@@ -48,6 +48,21 @@
                 .Single();
 
             this.typeRegistrations.Add(new TypeRegistration(typeof(TRegistration), implementation));
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TRegistration"></typeparam>
+        public void RegisterAll<TRegistration>()
+        {
+            var implementations = AppDomainAssemblyTypeScanner
+                .TypesOf<TRegistration>();
+
+            var registration =
+                new CollectionTypeRegistration(typeof(TRegistration), implementations);
+
+            this.collectionRegistrations.Add(registration);
         }
 
         /// <summary>
@@ -87,7 +102,7 @@
         /// will be used for the registration, else it will use <paramref name="defaultImplementation"/>.
         /// </summary>
         /// <typeparam name="TRegistration">The <see cref="Type"/> to register as.</typeparam>
-        /// <param name="defaultImplementation">The implementation of <typeparamref name="TRegistration"/> that will be use if no other implenmentation can be found.</param>
+        /// <param name="defaultImplementation">The implementation of <typeparamref name="TRegistration"/> that will be use if no other implementation can be found.</param>
         /// <remarks>
         /// When scanning, it will exclude the assembly that the <see cref="ApplicationRegistrations"/> instance is defined in and it will also ignore
         /// the type specified by <paramref name="defaultImplementation"/>.

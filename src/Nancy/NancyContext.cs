@@ -6,6 +6,7 @@ namespace Nancy
     using System.Linq;
     using Nancy.Diagnostics;
     using Nancy.Responses.Negotiation;
+    using Nancy.Routing;
     using Nancy.Security;
     using Nancy.Validation;
     using System.Globalization;
@@ -36,6 +37,11 @@ namespace Nancy
         /// Gets the dictionary for storage of per-request items. Disposable items will be disposed when the context is.
         /// </summary>
         public IDictionary<string, object> Items { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the resolved route 
+        /// </summary>
+        public Route ResolvedRoute { get; set; }
 
         /// <summary>
         /// Gets or sets the parameters for the resolved route 
@@ -73,7 +79,7 @@ namespace Nancy
         /// <summary>
         /// Diagnostic request tracing
         /// </summary>
-        public RequestTrace Trace { get; private set; }
+        public RequestTrace Trace { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether control panel access is enabled for this request
@@ -90,7 +96,7 @@ namespace Nancy
         /// </summary>
         public ModelValidationResult ModelValidationResult
         {
-            get { return this.modelValidationResult ?? new ModelValidationResult(null); }
+            get { return this.modelValidationResult ?? ModelValidationResult.Valid; }
             set { this.modelValidationResult = value; }
         }
 

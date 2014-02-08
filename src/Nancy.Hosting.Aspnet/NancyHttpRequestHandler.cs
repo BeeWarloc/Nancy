@@ -1,11 +1,12 @@
 namespace Nancy.Hosting.Aspnet
 {
     using System.Configuration;
+    using System.Threading.Tasks;
     using System.Web;
     using System;
     using Nancy.Bootstrapper;
 
-    public class NancyHttpRequestHandler : IHttpHandler
+    public class NancyHttpRequestHandler : IHttpAsyncHandler
     {
         private static INancyEngine engine;
 
@@ -36,7 +37,7 @@ namespace Nancy.Hosting.Aspnet
             if (configurationBootstrapperType != null)
             {
                 var bootstrapperType =
-                    Type.GetType(configurationBootstrapperType.Name);
+                    Type.GetType(string.Concat(configurationBootstrapperType.Name, ", ", configurationBootstrapperType.Assembly));
 
                 return Activator.CreateInstance(bootstrapperType) as INancyBootstrapper;
             }
@@ -70,9 +71,19 @@ namespace Nancy.Hosting.Aspnet
 
         public void ProcessRequest(HttpContext context)
         {
+            throw new NotSupportedException();
+        }
+
+        public IAsyncResult BeginProcessRequest(HttpContext context, AsyncCallback cb, object state)
+        {
             var wrappedContext = new HttpContextWrapper(context);
             var handler = new NancyHandler(engine);
-            handler.ProcessRequest(wrappedContext);
+            return handler.ProcessRequest(wrappedContext, cb, state);
+        }
+
+        public void EndProcessRequest(IAsyncResult result)
+        {
+            NancyHandler.EndProcessRequest((Task<Tuple<NancyContext, HttpContextBase>>)result);
         }
     }
 }

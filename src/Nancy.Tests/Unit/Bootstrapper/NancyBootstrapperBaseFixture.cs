@@ -8,6 +8,7 @@ namespace Nancy.Tests.Unit.Bootstrapper
     using System.Linq;
     using System.Collections;
     using System.Reflection;
+    using System.Threading;
     using FakeItEasy;
     using Nancy.Bootstrapper;
     using Nancy.Tests.Fakes;
@@ -201,13 +202,13 @@ namespace Nancy.Tests.Unit.Bootstrapper
             this.bootstrapper.Initialise();
 
             // When
-            var result = this.bootstrapper.PreRequest.Invoke(context);
+            var result = this.bootstrapper.PreRequest.Invoke(context, new CancellationToken());
 
             // Then
             result.ShouldNotBeNull();
-            result.ContentType.ShouldEqual("image/vnd.microsoft.icon");
-            result.StatusCode = HttpStatusCode.OK;
-            GetBodyBytes(result).SequenceEqual(favicon).ShouldBeTrue();
+            result.Result.ContentType.ShouldEqual("image/vnd.microsoft.icon");
+            result.Result.StatusCode = HttpStatusCode.OK;
+            GetBodyBytes(result.Result).SequenceEqual(favicon).ShouldBeTrue();
         }
 
         [Fact]
@@ -221,6 +222,17 @@ namespace Nancy.Tests.Unit.Bootstrapper
             A.CallTo(() => fakeDiagnostics.Initialize(A<IPipelines>._)).MustHaveHappened(Repeated.Exactly.Once);
         }
 
+        [Fact]
+        public void Should_dispose_app_container_if_bootstrapper_disposed()
+        {
+            this.bootstrapper.Initialise();
+            this.bootstrapper.GetEngine();
+
+            this.bootstrapper.Dispose();
+
+            this.bootstrapper.AppContainer.Disposed.ShouldBeTrue();
+        }
+
         private static IEnumerable<byte> GetBodyBytes(Response response)
         {
             using (var contentsStream = new MemoryStream())
@@ -232,12 +244,12 @@ namespace Nancy.Tests.Unit.Bootstrapper
         }
     }
 
-    internal class FakeBootstrapperBaseImplementation : NancyBootstrapperBase<object>
+    internal class FakeBootstrapperBaseImplementation : NancyBootstrapperBase<FakeContainer>
     {
         public IDiagnostics FakeDiagnostics { get; set; }
         public INancyEngine FakeNancyEngine { get; set; }
-        public object FakeContainer { get; set; }
-        public object AppContainer { get; set; }
+        public FakeContainer FakeContainer { get; set; }
+        public FakeContainer AppContainer { get; set; }
         public IEnumerable<TypeRegistration> TypeRegistrations { get; set; }
         public IEnumerable<CollectionTypeRegistration> CollectionTypeRegistrations { get; set; }
         public IEnumerable<InstanceRegistration> InstanceRegistrations { get; set; }
@@ -249,7 +261,7 @@ namespace Nancy.Tests.Unit.Bootstrapper
         public FakeBootstrapperBaseImplementation()
         {
             FakeNancyEngine = A.Fake<INancyEngine>();
-            FakeContainer = new object();
+            FakeContainer = new FakeContainer();
         }
 
         protected override INancyEngine GetEngineInternal()
@@ -263,9 +275,9 @@ namespace Nancy.Tests.Unit.Bootstrapper
         }
 
         /// <summary>
-        /// Gets the diagnostics for intialisation
+        /// Gets the diagnostics for initialisation
         /// </summary>
-        /// <returns>IDagnostics implementation</returns>
+        /// <returns>IDiagnostics implementation</returns>
         protected override IDiagnostics GetDiagnostics()
         {
             return this.FakeDiagnostics ?? new DisabledDiagnostics();
@@ -307,12 +319,12 @@ namespace Nancy.Tests.Unit.Bootstrapper
                     .FirstOrDefault();
         }
 
-        protected override void ConfigureApplicationContainer(object existingContainer)
+        protected override void ConfigureApplicationContainer(FakeContainer existingContainer)
         {
             this.AppContainer = existingContainer;
         }
 
-        protected override object GetApplicationContainer()
+        protected override FakeContainer GetApplicationContainer()
         {
             return FakeContainer;
         }
@@ -323,26 +335,26 @@ namespace Nancy.Tests.Unit.Bootstrapper
         /// to take the responsibility of registering things like INancyModuleCatalog manually.
         /// </summary>
         /// <param name="applicationContainer">Application container to register into</param>
-        protected override void RegisterBootstrapperTypes(object applicationContainer)
+        protected override void RegisterBootstrapperTypes(FakeContainer applicationContainer)
         {
         }
 
-        protected override void RegisterApplicationTypes(object container, IEnumerable<TypeRegistration> typeRegistrations)
+        protected override void RegisterApplicationTypes(FakeContainer container, IEnumerable<TypeRegistration> typeRegistrations)
         {
             this.TypeRegistrations = typeRegistrations;
         }
 
-        protected override void RegisterApplicationCollectionTypes(object container, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrations)
+        protected override void RegisterApplicationCollectionTypes(FakeContainer container, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrations)
         {
             this.CollectionTypeRegistrations = collectionTypeRegistrations;
         }
 
-        protected override void RegisterModules(object container, IEnumerable<ModuleRegistration> moduleRegistrationTypes)
+        protected override void RegisterModules(FakeContainer container, IEnumerable<ModuleRegistration> moduleRegistrationTypes)
         {
             PassedModules = new List<ModuleRegistration>(moduleRegistrationTypes);
         }
 
-        protected override void RegisterApplicationInstances(object container, IEnumerable<InstanceRegistration> instanceRegistrations)
+        protected override void RegisterApplicationInstances(FakeContainer container, IEnumerable<InstanceRegistration> instanceRegistrations)
         {
             this.InstanceRegistrations = instanceRegistrations;
         }
@@ -367,6 +379,16 @@ namespace Nancy.Tests.Unit.Bootstrapper
         public byte[] Favicon { get; set; }
     }
 
+    internal class FakeContainer : IDisposable
+    {
+        public void Dispose()
+        {
+            this.Disposed = true;
+        }
+
+        public bool Disposed { get; private set; }
+    }
+
     internal class FakeBootstrapperBaseGetModulesOverride : NancyBootstrapperBase<object>
     {
         public IEnumerable<ModuleRegistration> RegisterModulesRegistrationTypes { get; set; }
@@ -386,9 +408,9 @@ namespace Nancy.Tests.Unit.Bootstrapper
         }
 
         /// <summary>
-        /// Gets the diagnostics for intialisation
+        /// Gets the diagnostics for initialisation
         /// </summary>
-        /// <returns>IDagnostics implementation</returns>
+        /// <returns>IDiagnostics implementation</returns>
         protected override IDiagnostics GetDiagnostics()
         {
             return new DisabledDiagnostics();

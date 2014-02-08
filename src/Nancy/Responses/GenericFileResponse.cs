@@ -143,7 +143,7 @@ namespace Nancy.Responses
             var fi = new FileInfo(fullPath);
 
             var lastWriteTimeUtc = fi.LastWriteTimeUtc;
-            var etag = lastWriteTimeUtc.Ticks.ToString("x");
+            var etag = string.Concat("\"", lastWriteTimeUtc.Ticks.ToString("x"), "\"");
             var lastModified = lastWriteTimeUtc.ToString("R");
 
             if (CacheHelpers.ReturnNotModified(etag, lastWriteTimeUtc, context))
@@ -157,7 +157,12 @@ namespace Nancy.Responses
 
             this.Headers["ETag"] = etag;
             this.Headers["Last-Modified"] = lastModified;
-            this.Contents = GetFileContent(fullPath, fi.Length);
+            
+            if (fi.Length > 0)
+            {
+                this.Contents = GetFileContent(fullPath, fi.Length);
+            }
+            
             this.ContentType = contentType;
             this.StatusCode = HttpStatusCode.OK;
         }

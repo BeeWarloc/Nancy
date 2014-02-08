@@ -1,8 +1,10 @@
 namespace Nancy.Hosting.Aspnet
 {
+    using System;
     using System.Collections.Generic;
     using System.Globalization;
     using System.Linq;
+    using System.Threading.Tasks;
     using System.Web;
     using IO;
     using Nancy.Extensions;
@@ -27,14 +29,40 @@ namespace Nancy.Hosting.Aspnet
         /// Processes the ASP.NET request with Nancy.
         /// </summary>
         /// <param name="context">The <see cref="HttpContextBase"/> of the request.</param>
-        public void ProcessRequest(HttpContextBase context)
+        /// <param name="cb"></param>
+        /// <param name="state"></param>
+        public Task<Tuple<NancyContext, HttpContextBase>> ProcessRequest(HttpContextBase context, AsyncCallback cb, object state)
         {
             var request = CreateNancyRequest(context);
 
-            using (var nancyContext = this.engine.HandleRequest(request))
+            var tcs = new TaskCompletionSource<Tuple<NancyContext, HttpContextBase>>(state);
+
+            if (cb != null)
             {
-                SetNancyResponseToHttpResponse(context, nancyContext.Response);
+                tcs.Task.ContinueWith(task => cb(task), TaskContinuationOptions.ExecuteSynchronously);
             }
+
+            this.engine.HandleRequest(
+                request, 
+                ctx => tcs.SetResult(new Tuple<NancyContext, HttpContextBase>(ctx, context)), 
+                tcs.SetException);
+
+            return tcs.Task;
+        }
+
+        public static void EndProcessRequest(Task<Tuple<NancyContext, HttpContextBase>> task)
+        {
+            if (task.IsFaulted)
+            {
+                var exception = task.Exception;
+                exception.Handle(ex => ex is HttpException);
+            }
+
+            var nancyContext = task.Result.Item1;
+            var httpContext = task.Result.Item2;
+
+            NancyHandler.SetNancyResponseToHttpResponse(httpContext, nancyContext.Response);
+            nancyContext.Dispose();
         }
 
         private static Request CreateNancyRequest(HttpContextBase context)
@@ -61,7 +89,9 @@ namespace Nancy.Hosting.Aspnet
                                };
             byte[] certificate = null;
 
-            if (context.Request.ClientCertificate != null && context.Request.ClientCertificate.Certificate.Length != 0)
+            if (context.Request.ClientCertificate != null &&
+                context.Request.ClientCertificate.IsPresent &&
+                context.Request.ClientCertificate.Certificate.Length != 0)
             {
                 certificate = context.Request.ClientCertificate.Certificate;
             }
@@ -104,7 +134,7 @@ namespace Nancy.Hosting.Aspnet
             return contentLength;
         }
 
-        private static void SetNancyResponseToHttpResponse(HttpContextBase context, Response response)
+        public static void SetNancyResponseToHttpResponse(HttpContextBase context, Response response)
         {
             SetHttpResponseHeaders(context, response);
 
@@ -112,8 +142,14 @@ namespace Nancy.Hosting.Aspnet
             {
                 context.Response.ContentType = response.ContentType;
             }
+
+            if (response.ReasonPhrase != null)
+            {
+                context.Response.StatusDescription = response.ReasonPhrase;
+            }
+
             context.Response.StatusCode = (int)response.StatusCode;
-            response.Contents.Invoke(context.Response.OutputStream);         
+            response.Contents.Invoke(context.Response.OutputStream);
         }
 
         private static void SetHttpResponseHeaders(HttpContextBase context, Response response)

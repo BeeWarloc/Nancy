@@ -13,6 +13,7 @@ namespace Nancy.Testing
     using Nancy.ErrorHandling;
     using Nancy.ModelBinding;
     using Nancy.Routing;
+    using Nancy.Routing.Constraints;
     using Nancy.Routing.Trie;
     using Nancy.Security;
     using Nancy.TinyIoc;
@@ -33,6 +34,10 @@ namespace Nancy.Testing
         private DiagnosticsConfiguration diagnosticConfiguration;
         private readonly List<Action<TinyIoCContainer, IPipelines>> applicationStartupActions;
         private readonly List<Action<TinyIoCContainer, IPipelines, NancyContext>> requestStartupActions;
+
+        private bool configuredCollectionsRegistered;
+        private bool configuredInstancesRegistered;
+        private bool configuredTypesRegistered;
 
         /// <summary>
         /// Test project name suffixes that will be stripped from the test name project
@@ -308,7 +313,10 @@ namespace Nancy.Testing
                 container.AutoRegister();
                 this.RegisterBootstrapperTypes(container);
             }
-
+            
+            RegisterTypesInternal(this.ApplicationContainer, this.GetTypeRegistrations());
+            RegisterCollectionTypesInternal(this.ApplicationContainer, this.GetCollectionTypeRegistrations());
+            RegisterInstancesInternal(this.ApplicationContainer, this.registeredInstances);
         }
 
         /// <summary>
@@ -359,9 +367,9 @@ namespace Nancy.Testing
 
 
         /// <summary>
-        /// Gets the diagnostics for intialisation
+        /// Gets the diagnostics for initialisation
         /// </summary>
-        /// <returns>IDagnostics implementation</returns>
+        /// <returns>IDiagnostics implementation</returns>
         protected override IDiagnostics GetDiagnostics()
         {
             return this.ApplicationContainer.Resolve<IDiagnostics>();
@@ -409,13 +417,19 @@ namespace Nancy.Testing
         /// <param name="typeRegistrations">Type registrations to register</param>
         protected override void RegisterApplicationTypes(TinyIoCContainer container, IEnumerable<TypeRegistration> typeRegistrations)
         {
-            var configuredTypes = this.GetTypeRegistrations().ToList();
+            var configuredTypes = 
+                this.GetTypeRegistrations().ToList();
 
-            typeRegistrations = configuredTypes
-                .Concat(typeRegistrations.Where(x => configuredTypes.All(y => y.RegistrationType != x.RegistrationType)))
-                .Where(x => this.registeredInstances.All(y => y.RegistrationType != x.RegistrationType));
+            var filtered = typeRegistrations
+                .Where(x => !configuredTypes.Any(y => y.RegistrationType == x.RegistrationType))
+                .Where(x => !this.registeredInstances.Any(y => y.RegistrationType == x.RegistrationType));
 
-            foreach (var typeRegistration in typeRegistrations)
+            RegisterTypesInternal(container, filtered);
+        }
+
+        private static void RegisterTypesInternal(TinyIoCContainer container, IEnumerable<TypeRegistration> filtered)
+        {
+            foreach (var typeRegistration in filtered)
             {
                 container.Register(typeRegistration.RegistrationType, typeRegistration.ImplementationType).AsSingleton();
             }
@@ -429,14 +443,21 @@ namespace Nancy.Testing
         /// <param name="collectionTypeRegistrationsn">Collection type registrations to register</param>
         protected override void RegisterApplicationCollectionTypes(TinyIoCContainer container, IEnumerable<CollectionTypeRegistration> collectionTypeRegistrations)
         {
-            var configuredCollectionTypes = this.GetCollectionTypeRegistrations().ToList();
+            var configuredCollectionTypes = 
+                this.GetCollectionTypeRegistrations().ToList();
 
-            collectionTypeRegistrations = configuredCollectionTypes
-                .Concat(collectionTypeRegistrations.Where(x => configuredCollectionTypes.All(y => y.RegistrationType != x.RegistrationType)));
+            var filtered = collectionTypeRegistrations
+                .Where(x => !configuredCollectionTypes.Any(y => y.RegistrationType == x.RegistrationType));
 
-            foreach (var collectionTypeRegistration in collectionTypeRegistrations)
+            RegisterCollectionTypesInternal(container, filtered);
+        }
+
+        private static void RegisterCollectionTypesInternal(TinyIoCContainer container, IEnumerable<CollectionTypeRegistration> filtered)
+        {
+            foreach (var collectionTypeRegistration in filtered)
             {
-                container.RegisterMultiple(collectionTypeRegistration.RegistrationType, collectionTypeRegistration.ImplementationTypes);
+                container.RegisterMultiple(collectionTypeRegistration.RegistrationType,
+                    collectionTypeRegistration.ImplementationTypes);
             }
         }
 
@@ -447,11 +468,19 @@ namespace Nancy.Testing
         /// <param name="instanceRegistrations">Instance registration types</param>
         protected override void RegisterApplicationInstances(TinyIoCContainer container, IEnumerable<InstanceRegistration> instanceRegistrations)
         {
-            instanceRegistrations = this.registeredInstances
-                .Concat(instanceRegistrations.Where(x => this.registeredInstances.All(y => y.RegistrationType != x.RegistrationType)))
-                .Where(x => this.GetTypeRegistrations().All(y => y.RegistrationType != x.RegistrationType));
+            var configuredInstanceRegistrations = this.GetTypeRegistrations();
 
-            foreach (var instanceRegistration in instanceRegistrations)
+            var fileteredInstanceRegistrations = instanceRegistrations
+                .Where(x => !this.registeredInstances.Any(y => y.RegistrationType == x.RegistrationType))
+                .Where(x => !configuredInstanceRegistrations.Any(y => y.RegistrationType == x.RegistrationType))
+                .ToList();
+
+            RegisterInstancesInternal(container, fileteredInstanceRegistrations);
+        }
+
+        private static void RegisterInstancesInternal(TinyIoCContainer container, IEnumerable<InstanceRegistration> fileteredInstanceRegistrations)
+        {
+            foreach (var instanceRegistration in fileteredInstanceRegistrations)
             {
                 container.Register(
                     instanceRegistration.RegistrationType,
@@ -670,7 +699,7 @@ namespace Nancy.Testing
             {
                 this.bootstrapper.registeredTypes.Add(new TypeRegistration(typeof(T), typeof(T)));
 
-                foreach (var interfaceType in typeof(T).GetInterfaces())
+                foreach (var interfaceType in GetSafeInterfaces(typeof(T)))
                 {
                     this.bootstrapper.registeredTypes.Add(new TypeRegistration(interfaceType, typeof(T)));
                 }
@@ -688,12 +717,17 @@ namespace Nancy.Testing
             {
                 this.bootstrapper.registeredInstances.Add(new InstanceRegistration(typeof(T), instance));
 
-                foreach (var interfaceType in instance.GetType().GetInterfaces())
+                foreach (var interfaceType in GetSafeInterfaces(instance.GetType()))
                 {
                     this.bootstrapper.registeredInstances.Add(new InstanceRegistration(interfaceType, instance));
                 }
 
                 return this;
+            }
+
+            private static IEnumerable<Type> GetSafeInterfaces(Type type)
+            {
+                return type.GetInterfaces().Where(x => x != typeof(IDisposable));
             }
 
             /// <summary>
@@ -773,7 +807,7 @@ namespace Nancy.Testing
             }
 
             /// <summary>
-            /// Disables the auto registration behavior of the bootstrapper
+            /// Enables the auto registration behavior of the bootstrapper
             /// </summary>
             /// <returns>A reference to the current <see cref="ConfigurableBootstrapperConfigurator"/>.</returns>
             public ConfigurableBootstrapperConfigurator EnableAutoRegistration()
@@ -1034,7 +1068,7 @@ namespace Nancy.Testing
                 return this;
             }
 
-            /// <summary>
+            /// <summary> 
             /// Configures the bootstrapper to use the provided instance of <see cref="IRootPathProvider"/>.
             /// </summary>
             /// <param name="rootPathProvider">The <see cref="IRootPathProvider"/> instance that should be used by the bootstrapper.</param>
@@ -1061,7 +1095,7 @@ namespace Nancy.Testing
             }
 
             /// <summary>
-            /// Configures the bootstrapper to use the provided instance of <see cref="IRoutePatternMatcher"/>.
+            /// Configures the bootstrapper to usgezze the provided instance of <see cref="IRoutePatternMatcher"/>.
             /// </summary>
             /// <param name="routePatternMatcher">The <see cref="IRoutePatternMatcher"/> instance that should be used by the bootstrapper.</param>
             /// <returns>A reference to the current <see cref="ConfigurableBootstrapperConfigurator"/>.</returns>
@@ -1203,6 +1237,30 @@ namespace Nancy.Testing
             public ConfigurableBootstrapperConfigurator ResourceAssemblyProvider<T>() where T : IResourceAssemblyProvider
             {
                 this.bootstrapper.configuration.ResourceAssemblyProvider = typeof(T);
+                return this;
+            }
+
+            /// <summary>
+            /// Configures the bootstrapper to use the provided instance of <see cref="IResourceReader"/>.
+            /// </summary>
+            /// <param name="resourceReader">The <see cref="IResourceReader"/> instance that should be used by the bootstrapper.</param>
+            /// <returns>A reference to the current <see cref="ConfigurableBootstrapperConfigurator"/>.</returns>
+            public ConfigurableBootstrapperConfigurator ResourceReader(IResourceReader resourceReader)
+            {
+                this.bootstrapper.registeredInstances.Add(
+                    new InstanceRegistration(typeof(IResourceReader), resourceReader));
+
+                return this;
+            }
+
+            /// <summary>
+            /// Configures the bootstrapper to create an <see cref="IResourceReader"/> instance of the specified type.
+            /// </summary>
+            /// <typeparam name="T">The type of the <see cref="IResourceReader"/> that the bootstrapper should use.</typeparam>
+            /// <returns>A reference to the current <see cref="ConfigurableBootstrapperConfigurator"/>.</returns>
+            public ConfigurableBootstrapperConfigurator ResourceReader<T>() where T : IResourceReader
+            {
+                this.bootstrapper.configuration.ResourceReader = typeof(T);
                 return this;
             }
 
@@ -1666,6 +1724,18 @@ namespace Nancy.Testing
             public ConfigurableBootstrapperConfigurator TrieNodeFactory<T>() where T : ITrieNodeFactory
             {
                 this.bootstrapper.configuration.TrieNodeFactory = typeof(T);
+                return this;
+            }
+
+            public ConfigurableBootstrapperConfigurator RouteSegmentConstraint<T>() where T : IRouteSegmentConstraint
+            {
+                this.bootstrapper.configuration.RouteSegmentConstraints = new List<Type> { typeof(T) };
+                return this;
+            }
+
+            public ConfigurableBootstrapperConfigurator RouteSegmentConstraints(params Type[] types)
+            {
+                this.bootstrapper.configuration.RouteSegmentConstraints = new List<Type>(types);
                 return this;
             }
 

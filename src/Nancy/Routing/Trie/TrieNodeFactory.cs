@@ -1,12 +1,23 @@
 namespace Nancy.Routing.Trie
 {
-    using Nancy.Routing.Trie.Nodes;
+    using System.Linq;
+    using System.Collections.Generic;
 
+    using Nancy.Routing.Constraints;
+    using Nancy.Routing.Trie.Nodes;
+    
     /// <summary>
     /// Factory for creating the correct type of TrieNode
     /// </summary>
     public class TrieNodeFactory : ITrieNodeFactory
     {
+        private readonly IEnumerable<IRouteSegmentConstraint> routeSegmentConstraints;
+
+        public TrieNodeFactory(IEnumerable<IRouteSegmentConstraint> routeSegmentConstraints)
+        {
+            this.routeSegmentConstraints = routeSegmentConstraints;
+        }
+
         /// <summary>
         /// Gets the correct Trie node type for the given segment
         /// </summary>
@@ -20,12 +31,16 @@ namespace Nancy.Routing.Trie
                 return new RootNode(this);
             }
 
-            if (segment.StartsWith("(") && segment.EndsWith(")"))
+            var chars = segment.ToCharArray();
+            var start = chars[0];
+            var end = chars[chars.Length - 1];
+
+            if (start == '(' && end == ')')
             {
                 return new RegExNode(parent, segment, this);
             }
-
-            if (segment.StartsWith("{") && segment.EndsWith("}"))
+            
+            if (start == '{' && end == '}' && chars.Count(c => c == '{' || c == '}') == 2)
             {
                 return this.GetCaptureNode(parent, segment);
             }
@@ -35,11 +50,21 @@ namespace Nancy.Routing.Trie
                 return new GreedyRegExCaptureNode(parent, segment, this);
             }
 
+            if (CaptureNodeWithMultipleParameters.IsMatch(segment))
+            {
+                return new CaptureNodeWithMultipleParameters(parent, segment, this);
+            }
+
             return new LiteralNode(parent, segment, this);
         }
 
         private TrieNode GetCaptureNode(TrieNode parent, string segment)
         {
+            if (segment.Contains(":"))
+            {
+                return new CaptureNodeWithConstraint(parent, segment, this, routeSegmentConstraints);
+            }
+
             if (segment.EndsWith("?}"))
             {
                 return new OptionalCaptureNode(parent, segment, this);

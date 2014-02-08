@@ -1,11 +1,16 @@
 namespace Nancy.Tests.Unit
 {
     using System;
+    using System.Collections.Generic;
+    using System.Threading;
+    using System.Threading.Tasks;
+
     using FakeItEasy;
     using Nancy.Bootstrapper;
     using Nancy.Diagnostics;
     using Nancy.ErrorHandling;
     using Nancy.Extensions;
+    using Nancy.Helpers;
     using Nancy.Routing;
     using Nancy.Tests.Fakes;
     using Xunit;
@@ -34,7 +39,8 @@ namespace Nancy.Tests.Unit
             this.requestDispatcher = A.Fake<IRequestDispatcher>();
             this.diagnosticsConfiguration = new DiagnosticsConfiguration();
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(A<NancyContext>._)).Invokes(x => this.context.Response = new Response());
+            A.CallTo(() => this.requestDispatcher.Dispatch(A<NancyContext>._, A<CancellationToken>._))
+                .Returns(CreateResponseTask(new Response()));
 
             A.CallTo(() => this.statusCodeHandler.HandlesStatusCode(A<HttpStatusCode>.Ignored, A<NancyContext>.Ignored)).Returns(false);
 
@@ -48,9 +54,9 @@ namespace Nancy.Tests.Unit
 
             this.routeInvoker = A.Fake<IRouteInvoker>();
 
-            A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<DynamicDictionary>._, A<NancyContext>._)).ReturnsLazily(arg =>
+            A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<CancellationToken>._, A<DynamicDictionary>._, A<NancyContext>._)).ReturnsLazily(arg =>
             {
-                return (Response)((Route)arg.Arguments[0]).Action.Invoke((DynamicDictionary)arg.Arguments[1]);
+                return ((Route)arg.Arguments[0]).Action.Invoke((DynamicDictionary)arg.Arguments[1], A<CancellationToken>._).Result;
             });
 
             this.engine =
@@ -125,7 +131,8 @@ namespace Nancy.Tests.Unit
             // Given
             var request = new Request("GET", "/", "http");
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(this.context)).Invokes(x => this.context.Response = this.response);
+            A.CallTo(() => this.requestDispatcher.Dispatch(this.context, A<CancellationToken>._))
+                .Returns(CreateResponseTask(this.response));
 
             // When
             var result = this.engine.HandleRequest(request);
@@ -338,7 +345,8 @@ namespace Nancy.Tests.Unit
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(new NotImplementedException());
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(new NotImplementedException()));
 
             var request = new Request("GET", "/", "http");
 
@@ -362,7 +370,8 @@ namespace Nancy.Tests.Unit
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(new NotImplementedException());
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(new NotImplementedException()));
 
             var request = new Request("GET", "/", "http");
 
@@ -380,7 +389,7 @@ namespace Nancy.Tests.Unit
             var testEx = new Exception();
 
             var errorRoute =
-                new Route("GET", "/", null, x => { throw testEx; });
+                new Route("GET", "/", null, (x,c) => { throw testEx; });
 
             var resolvedRoute = new ResolveResult(
                 errorRoute,
@@ -391,7 +400,8 @@ namespace Nancy.Tests.Unit
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(testEx);
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(testEx));
 
             Exception handledException = null;
             NancyContext handledContext = null;
@@ -425,19 +435,18 @@ namespace Nancy.Tests.Unit
         {
             // Given
             var routeUnderTest =
-                new Route("GET", "/", null, x => { throw new Exception(); });
+                new Route("GET", "/", null, (x,c) => { throw new Exception(); });
 
             var resolved =
                 new ResolveResult(routeUnderTest, DynamicDictionary.Empty, null, null, null);
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolved);
 
-            A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<DynamicDictionary>._, A<NancyContext>._)).Invokes((x) =>
-            {
-                routeUnderTest.Action.Invoke(DynamicDictionary.Empty);
-            });
+            A.CallTo(() => this.routeInvoker.Invoke(A<Route>._, A<CancellationToken>._, A<DynamicDictionary>._, A<NancyContext>._))
+                .Invokes((x) => routeUnderTest.Action.Invoke(DynamicDictionary.Empty, new CancellationToken()));
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(new Exception());
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(new Exception()));
 
             var pipelines = new Pipelines();
             pipelines.OnError.AddItemToStartOfPipeline((ctx, exception) => null);
@@ -468,7 +477,8 @@ namespace Nancy.Tests.Unit
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(expectedException);
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(expectedException));
 
             var pipelines = new Pipelines();
             pipelines.OnError.AddItemToStartOfPipeline((ctx, exception) => null);
@@ -485,6 +495,154 @@ namespace Nancy.Tests.Unit
         }
 
         [Fact]
+        public void Should_persist_and_unwrap_original_exception_in_requestexecutionexception()
+        {
+            // Given
+            var expectedException = new Exception();
+            var aggregateException = new AggregateException(expectedException);
+
+            var resolvedRoute = new ResolveResult(
+               new FakeRoute(),
+               DynamicDictionary.Empty,
+               null,
+               null,
+               null);
+
+            A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
+
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(aggregateException));
+
+            var pipelines = new Pipelines();
+            pipelines.OnError.AddItemToStartOfPipeline((ctx, exception) => null);
+            engine.RequestPipelinesFactory = (ctx) => pipelines;
+
+            var request = new Request("GET", "/", "http");
+
+            // When
+            var result = this.engine.HandleRequest(request);
+            var returnedException = result.Items["ERROR_EXCEPTION"] as RequestExecutionException;
+
+            // Then
+            returnedException.InnerException.ShouldBeSameAs(expectedException);
+        }
+
+        [Fact]
+        public void Should_persist_and_unwrap_nested_original_exception_in_requestexecutionexception()
+        {
+            // Given
+            var expectedException = new Exception();
+            var expectedExceptionInner = new AggregateException(expectedException);
+            var aggregateExceptionOuter = new AggregateException(expectedExceptionInner);
+
+            var resolvedRoute = new ResolveResult(
+               new FakeRoute(),
+               DynamicDictionary.Empty,
+               null,
+               null,
+               null);
+
+            A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
+
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(aggregateExceptionOuter));
+
+            var pipelines = new Pipelines();
+            pipelines.OnError.AddItemToStartOfPipeline((ctx, exception) => null);
+            engine.RequestPipelinesFactory = (ctx) => pipelines;
+
+            var request = new Request("GET", "/", "http");
+
+            // When
+            var result = this.engine.HandleRequest(request);
+            var returnedException = result.Items["ERROR_EXCEPTION"] as RequestExecutionException;
+
+            // Then
+            returnedException.InnerException.ShouldBeSameAs(expectedException);
+        }
+
+        [Fact]
+        public void Should_persist_and_unwrap_multiple_nested_original_exception_in_requestexecutionexception()
+        {
+            // Given
+            var expectedException1 = new Exception();
+            var expectedException2 = new Exception();
+            var expectedException3 = new Exception();
+            var exceptionsList = new List<Exception>() { expectedException1, expectedException2, expectedException3 };
+            var aggregateExceptionInner = new AggregateException(exceptionsList);
+            var aggregateExceptionOuter = new AggregateException(aggregateExceptionInner);
+
+            var resolvedRoute = new ResolveResult(
+               new FakeRoute(),
+               DynamicDictionary.Empty,
+               null,
+               null,
+               null);
+
+            A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
+
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(aggregateExceptionOuter));
+
+            var pipelines = new Pipelines();
+            pipelines.OnError.AddItemToStartOfPipeline((ctx, exception) => null);
+            engine.RequestPipelinesFactory = (ctx) => pipelines;
+
+            var request = new Request("GET", "/", "http");
+
+            // When
+            var result = this.engine.HandleRequest(request);
+            var returnedException = result.Items["ERROR_EXCEPTION"] as RequestExecutionException;
+
+            // Then
+            var returnedInnerException = returnedException.InnerException as AggregateException;
+            returnedInnerException.ShouldBeOfType(typeof(AggregateException));
+            Assert.Equal(exceptionsList.Count, returnedInnerException.InnerExceptions.Count);
+        }
+
+        [Fact]
+        public void Should_persist_and_unwrap_multiple_nested_original_exception_in_requestexecutionexception_with_exceptions_on_multiple_levels()
+        {
+            // Given
+            var expectedException1 = new Exception();
+            var expectedException2 = new Exception();
+            var expectedException3 = new Exception();
+            var expectedException4 = new Exception();
+            var expectgedInnerExceptions = 4;
+            var exceptionsListInner = new List<Exception>() { expectedException1, expectedException2, expectedException3 };
+            var expectedExceptionInner = new AggregateException(exceptionsListInner);
+            var exceptionsListOuter = new List<Exception>() { expectedExceptionInner, expectedException4 };
+            var aggregateExceptionOuter = new AggregateException(exceptionsListOuter);
+
+            var resolvedRoute = new ResolveResult(
+               new FakeRoute(),
+               DynamicDictionary.Empty,
+               null,
+               null,
+               null);
+
+            A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
+
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(aggregateExceptionOuter));
+
+            var pipelines = new Pipelines();
+            pipelines.OnError.AddItemToStartOfPipeline((ctx, exception) => null);
+            engine.RequestPipelinesFactory = (ctx) => pipelines;
+
+            var request = new Request("GET", "/", "http");
+
+            // When
+            var result = this.engine.HandleRequest(request);
+            var returnedException = result.Items["ERROR_EXCEPTION"] as RequestExecutionException;
+
+            // Then
+            var returnedInnerException = returnedException.InnerException as AggregateException;
+            returnedInnerException.ShouldBeOfType(typeof(AggregateException));
+            Assert.Equal(expectgedInnerExceptions, returnedInnerException.InnerExceptions.Count);
+        }
+
+        [Fact]
         public void Should_add_requestexecutionexception_to_context_when_pipeline_is_null()
         {
             // Given
@@ -497,7 +655,8 @@ namespace Nancy.Tests.Unit
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(new Exception());
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+             .Returns(TaskHelpers.GetFaultedTask<Response>(new Exception()));
 
             var pipelines = new Pipelines { OnError = null };
             engine.RequestPipelinesFactory = (ctx) => pipelines;
@@ -527,7 +686,8 @@ namespace Nancy.Tests.Unit
 
             A.CallTo(() => resolver.Resolve(A<NancyContext>.Ignored)).Returns(resolvedRoute);
 
-            A.CallTo(() => this.requestDispatcher.Dispatch(context)).Throws(expectedException);
+            A.CallTo(() => this.requestDispatcher.Dispatch(context, A<CancellationToken>._))
+                .Returns(TaskHelpers.GetFaultedTask<Response>(expectedException));
 
             var pipelines = new Pipelines { OnError = null };
             engine.RequestPipelinesFactory = (ctx) => pipelines;
@@ -561,6 +721,16 @@ namespace Nancy.Tests.Unit
             var result = localEngine.HandleRequest(request);
 
             result.Response.ShouldBeSameAs(localResponse);
+        }
+
+        private static Task<Response> CreateResponseTask(Response response)
+        {
+            var tcs =
+                new TaskCompletionSource<Response>();
+
+            tcs.SetResult(response);
+
+            return tcs.Task;
         }
     }
 }

@@ -2,6 +2,8 @@
 {
     using System;
     using System.Linq;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Xunit;
 
     public class BeforePipelineFixture
@@ -36,7 +38,7 @@
             pipeline.AddItemToEndOfPipeline(item2);
             pipeline.AddItemToEndOfPipeline(item3);
 
-            pipeline.Invoke(CreateContext());
+            pipeline.Invoke(CreateContext(), new CancellationToken());
 
             Assert.True(item1Called);
             Assert.True(item2Called);
@@ -54,9 +56,9 @@
             pipeline.AddItemToEndOfPipeline(item2);
             pipeline.AddItemToEndOfPipeline(item3);
 
-            var result = pipeline.Invoke(CreateContext());
+            var result = pipeline.Invoke(CreateContext(), new CancellationToken());
 
-            Assert.Same(response, result);
+            Assert.Same(response, result.Result);
         }
 
         [Fact]
@@ -69,42 +71,35 @@
             pipeline.AddItemToEndOfPipeline(item2);
             pipeline.AddItemToEndOfPipeline(item3);
 
-            var result = pipeline.Invoke(CreateContext());
+            var result = pipeline.Invoke(CreateContext(), new CancellationToken());
 
-            Assert.Null(result);
+            Assert.Null(result.Result);
         }
 
         [Fact]
         public void PlusEquals_with_func_add_item_to_end_of_pipeline()
         {
-            Func<NancyContext, Response> item1 = (r) => { return null; };
-            Func<NancyContext, Response> item2 = (r) => { return CreateResponse(); };
-            pipeline.AddItemToEndOfPipeline(item2);
+            pipeline.AddItemToEndOfPipeline(r => CreateResponse());
 
-            pipeline += item1;
+            pipeline += r => null;
 
             Assert.Equal(2, pipeline.PipelineDelegates.Count());
-            Assert.Same(item1, pipeline.PipelineDelegates.Last());
         }
 
         [Fact]
         public void PlusEquals_with_another_pipeline_adds_those_pipeline_items_to_end_of_pipeline()
         {
-            Func<NancyContext, Response> item1 = (r) => { return null; };
-            Func<NancyContext, Response> item2 = (r) => { return CreateResponse(); };
-            pipeline.AddItemToEndOfPipeline(item1);
-            pipeline.AddItemToEndOfPipeline(item2);
-            Func<NancyContext, Response> item3 = (r) => { return null; };
-            Func<NancyContext, Response> item4 = (r) => { return CreateResponse(); };
+            pipeline.AddItemToEndOfPipeline(r => null);
+            pipeline.AddItemToEndOfPipeline(r => CreateResponse());
             var pipeline2 = new BeforePipeline();
-            pipeline2.AddItemToEndOfPipeline(item3);
-            pipeline2.AddItemToEndOfPipeline(item4);
+            pipeline2.AddItemToEndOfPipeline(r => null);
+            pipeline2.AddItemToEndOfPipeline(r => CreateResponse());
 
             pipeline += pipeline2;
 
-            Assert.Equal(4, pipeline.PipelineDelegates.Count());
-            Assert.Same(item3, pipeline.PipelineDelegates.ElementAt(2));
-            Assert.Same(item4, pipeline.PipelineDelegates.Last());
+            Assert.Equal(4, pipeline.PipelineItems.Count());
+            Assert.Same(pipeline2.PipelineDelegates.ElementAt(0), pipeline.PipelineDelegates.ElementAt(2));
+            Assert.Same(pipeline2.PipelineDelegates.ElementAt(1), pipeline.PipelineDelegates.Last());
         }
 
         [Fact]
@@ -120,8 +115,8 @@
             pipeline.AddItemToEndOfPipeline(item2);
             pipeline.AddItemToEndOfPipeline(item3);
 
-            Func<NancyContext, Response> func = pipeline;
-            func.Invoke(CreateContext());
+            Func<NancyContext, CancellationToken, Task<Response>> func = pipeline;
+            func.Invoke(CreateContext(), new CancellationToken());
 
             Assert.True(item1Called);
             Assert.True(item2Called);
@@ -131,12 +126,12 @@
         [Fact]
         public void When_cast_from_func_creates_a_pipeline_with_one_item()
         {
-            Func<NancyContext, Response> item1 = (r) => null;
+            Func <NancyContext, CancellationToken,Task<Response>> item2 = (token, task) => null;
 
-            BeforePipeline castPipeline = item1;
+            BeforePipeline castPipeline = item2;
 
             Assert.Equal(1, castPipeline.PipelineDelegates.Count());
-            Assert.Same(item1, castPipeline.PipelineDelegates.First());
+            Assert.Same(item2, castPipeline.PipelineDelegates.First());
         }
 
         [Fact]
@@ -157,7 +152,7 @@
             subPipeline += item4;
 
             pipeline.AddItemToEndOfPipeline(subPipeline);
-            pipeline.Invoke(CreateContext());
+            pipeline.Invoke(CreateContext(), new CancellationToken());
 
             Assert.True(item1Called);
             Assert.True(item2Called);

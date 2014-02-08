@@ -40,8 +40,7 @@ namespace Nancy.Conventions
                 var path =
                     HttpUtility.UrlDecode(ctx.Request.Path);
 
-                var fileName = 
-                    Path.GetFileName(path);
+                var fileName = GetSafeFileName(path);
 
                 if (string.IsNullOrEmpty(fileName))
                 {
@@ -72,22 +71,15 @@ namespace Nancy.Conventions
             };
         }
 
-        private static string GetContentPath(string requestedPath, string contentPath)
-        {
-            contentPath =
-                contentPath ?? requestedPath;
-
-            if (!contentPath.StartsWith("/"))
-            {
-                contentPath = string.Concat("/", contentPath);
-            }
-
-            return contentPath;
-        }
-
+        /// <summary>
+        /// Adds a directory-based convention for static convention.
+        /// </summary>
+        /// <param name="requestedFile">The file that should be matched with the request.</param>
+        /// <param name="contentFile">The file that should be served when the requested path is matched.</param>
         public static Func<NancyContext, string, Response> AddFile(string requestedFile, string contentFile)
         {
-            return (ctx, root) => {
+            return (ctx, root) =>
+            {
 
                 var path =
                     ctx.Request.Path;
@@ -105,12 +97,45 @@ namespace Nancy.Conventions
             };
         }
 
+        private static string GetSafeFileName(string path)
+        {
+            try
+            {
+                return Path.GetFileName(path);
+            }
+            catch (Exception)
+            {
+            }
+                
+            return null;
+        }
+
+        private static string GetContentPath(string requestedPath, string contentPath)
+        {
+            contentPath =
+                contentPath ?? requestedPath;
+
+            if (!contentPath.StartsWith("/"))
+            {
+                contentPath = string.Concat("/", contentPath);
+            }
+
+            return contentPath;
+        }
+
         private static Func<ResponseFactoryCacheKey, Func<NancyContext, Response>> BuildContentDelegate(NancyContext context, string applicationRootPath, string requestedPath, string contentPath, string[] allowedExtensions)
         {
             return pathAndRootPair =>
             {
                 context.Trace.TraceLog.WriteLog(x => x.AppendLine(string.Concat("[StaticContentConventionBuilder] Attempting to resolve static content '", pathAndRootPair, "'")));
-                var extension = Path.GetExtension(pathAndRootPair.Path).Substring(1);
+
+                var extension = 
+                    Path.GetExtension(pathAndRootPair.Path);
+
+                if (!string.IsNullOrEmpty(extension))
+                {
+                    extension = extension.Substring(1);
+                }
 
                 if (allowedExtensions.Length != 0 && !allowedExtensions.Any(e => string.Equals(e.TrimStart(new [] {'.'}), extension, StringComparison.OrdinalIgnoreCase)))
                 {

@@ -4,8 +4,10 @@
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-
+    using System.Threading;
     using Nancy.Conventions;
+    using Nancy.Diagnostics;
+    using Nancy.ErrorHandling;
     using Nancy.Responses.Negotiation;
     using Nancy.Routing;
     using Nancy.Tests.Fakes;
@@ -30,7 +32,7 @@
             var context = new NancyContext();
 
             // When
-            this.invoker.Invoke(route, parameters, context);
+            this.invoker.Invoke(route, new CancellationToken(), parameters, context);
 
             // Then
             Assert.Same(route.ParametersUsedToInvokeAction, parameters);
@@ -45,7 +47,7 @@
             var context = new NancyContext();
 
             // When
-            var result = this.invoker.Invoke(route, parameters, context);
+            var result = this.invoker.Invoke(route, new CancellationToken(), parameters, context).Result;
 
             // Then
             Assert.IsType<Response>(result);
@@ -60,7 +62,7 @@
             var context = new NancyContext();
 
             // When
-            var result = this.invoker.Invoke(route, parameters, context);
+            var result = this.invoker.Invoke(route, new CancellationToken(), parameters, context).Result;
 
             // Then
             Assert.IsType<Response>(result);
@@ -75,7 +77,7 @@
             var context = new NancyContext();
 
             // When
-            var result = this.invoker.Invoke(route, parameters, context);
+            var result = this.invoker.Invoke(route, new CancellationToken(), parameters, context).Result;
 
             // Then
             Assert.IsType<Response>(result);
@@ -91,10 +93,42 @@
             var context = new NancyContext();
 
             // When
-            var result = this.invoker.Invoke(route, parameters, context);
+            var result = this.invoker.Invoke(route, new CancellationToken(), parameters, context).Result;
 
             // Then
             Assert.IsType<Response>(result);
+        }
+
+        [Fact]
+        public void Should_handle_RouteExecutionEarlyExitException_gracefully()
+        {
+            // Given
+            var response = new Response();
+            var route = new FakeRoute((c, t) => { throw new RouteExecutionEarlyExitException(response); });
+            var parameters = new DynamicDictionary();
+            var context = new NancyContext();
+
+            // When
+            var result = this.invoker.Invoke(route, new CancellationToken(), parameters, context).Result;
+
+            // Then
+            result.ShouldBeSameAs(response);
+        }
+
+        [Fact]
+        public void Should_log_the_reason_for_early_exits()
+        {
+            // Given
+            var response = new Response();
+            var route = new FakeRoute((c, t) => { throw new RouteExecutionEarlyExitException(response, "Reason Testing"); });
+            var parameters = new DynamicDictionary();
+            var context = new NancyContext { Trace = new RequestTrace(true) };
+
+            // When
+            var result = this.invoker.Invoke(route, new CancellationToken(), parameters, context).Result;
+
+            // Then
+            context.Trace.TraceLog.ToString().ShouldContain("Reason Testing");
         }
     }
 }

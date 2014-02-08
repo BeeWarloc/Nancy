@@ -4,12 +4,15 @@ namespace Nancy.Diagnostics
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
+    using System.Threading;
+
     using Bootstrapper;
     using Cookies;
     using Cryptography;
     using Helpers;
     using ModelBinding;
 
+    using Nancy.Routing.Constraints;
     using Nancy.Routing.Trie;
 
     using Responses;
@@ -19,11 +22,23 @@ namespace Nancy.Diagnostics
 
     public static class DiagnosticsHook
     {
+        private static readonly CancellationToken CancellationToken = new CancellationToken();
+
         private const string PipelineKey = "__Diagnostics";
 
         internal const string ItemsKey = "DIAGS_REQUEST";
 
-        public static void Enable(DiagnosticsConfiguration diagnosticsConfiguration, IPipelines pipelines, IEnumerable<IDiagnosticsProvider> providers, IRootPathProvider rootPathProvider, IEnumerable<ISerializer> serializers, IRequestTracing requestTracing, NancyInternalConfiguration configuration, IModelBinderLocator modelBinderLocator, IEnumerable<IResponseProcessor> responseProcessors, ICultureService cultureService)
+        public static void Enable(
+            DiagnosticsConfiguration diagnosticsConfiguration,
+            IPipelines pipelines,
+            IEnumerable<IDiagnosticsProvider> providers,
+            IRootPathProvider rootPathProvider,
+            IRequestTracing requestTracing,
+            NancyInternalConfiguration configuration,
+            IModelBinderLocator modelBinderLocator,
+            IEnumerable<IResponseProcessor> responseProcessors,
+            IEnumerable<IRouteSegmentConstraint> routeSegmentConstraints,
+            ICultureService cultureService)
         {
             var diagnosticsModuleCatalog = new DiagnosticsModuleCatalog(providers, rootPathProvider, requestTracing, configuration, diagnosticsConfiguration);
 
@@ -31,9 +46,9 @@ namespace Nancy.Diagnostics
 
             var diagnosticsRouteResolver = new DefaultRouteResolver(
                 diagnosticsModuleCatalog,
-                new DiagnosticsModuleBuilder(rootPathProvider, serializers, modelBinderLocator),
+                new DiagnosticsModuleBuilder(rootPathProvider, modelBinderLocator),
                 diagnosticsRouteCache,
-                new RouteResolverTrie(new TrieNodeFactory()));
+                new RouteResolverTrie(new TrieNodeFactory(routeSegmentConstraints)));
 
             var serializer = new DefaultObjectSerializer();
 
@@ -104,8 +119,6 @@ namespace Nancy.Diagnostics
         {
             var session = GetSession(ctx, diagnosticsConfiguration, serializer);
 
-            
-
             if (session == null)
             {
                 var view = GetDiagnosticsLoginView(ctx);
@@ -119,11 +132,14 @@ namespace Nancy.Diagnostics
             var resolveResult = routeResolver.Resolve(ctx);
 
             ctx.Parameters = resolveResult.Parameters;
-            ExecuteRoutePreReq(ctx, resolveResult.Before);
+            ExecuteRoutePreReq(ctx, CancellationToken, resolveResult.Before);
 
             if (ctx.Response == null)
             {
-                ctx.Response = resolveResult.Route.Invoke(resolveResult.Parameters);
+                // Don't care about async here, so just get the result
+                var task = resolveResult.Route.Invoke(resolveResult.Parameters, CancellationToken);
+                task.Wait();
+                ctx.Response = task.Result;
             }
 
             if (ctx.Request.Method.ToUpperInvariant() == "HEAD")
@@ -133,7 +149,7 @@ namespace Nancy.Diagnostics
 
             if (resolveResult.After != null)
             {
-                resolveResult.After.Invoke(ctx);
+                resolveResult.After.Invoke(ctx, CancellationToken);
             }
 
             AddUpdateSessionCookie(session, ctx, diagnosticsConfiguration, serializer);
@@ -237,14 +253,14 @@ namespace Nancy.Diagnostics
                 context.Request.Url.Path == "/";
         }
 
-        private static void ExecuteRoutePreReq(NancyContext context, Func<NancyContext, Response> resolveResultPreReq)
+        private static void ExecuteRoutePreReq(NancyContext context, CancellationToken cancellationToken, BeforePipeline resolveResultPreReq)
         {
             if (resolveResultPreReq == null)
             {
                 return;
             }
 
-            var resolveResultPreReqResponse = resolveResultPreReq.Invoke(context);
+            var resolveResultPreReqResponse = resolveResultPreReq.Invoke(context, cancellationToken).Result;
 
             if (resolveResultPreReqResponse != null)
             {
